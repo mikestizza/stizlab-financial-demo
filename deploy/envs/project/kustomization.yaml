@@ -17,9 +17,9 @@ resources:
   - ../../base
 images:
   - name: ghcr.io/mikestizza/teller-web
-    newTag: main-ee6d4a6
+    newTag: main-cfa36e3
   - name: ghcr.io/mikestizza/ledger-api
-    newTag: main-ee6d4a6
+    newTag: main-cfa36e3
 configMapGenerator:
   - name: teller-config
     behavior: merge
