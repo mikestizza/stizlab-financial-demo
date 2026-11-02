@@ -1,0 +1,18 @@
+# Layer 3: non-secret configuration. Every key becomes an environment variable
+# in the web pods (envFrom, layer 7). The image is identical in every environment;
+# this object is what makes this one "production".
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: teller-config                             # referenced by name from the Deployment's envFrom
+  namespace: teller
+  labels:
+    app.kubernetes.io/part-of: teller
+data:                                            # plain string key/values; .NET reads "Teller__Banner" as config "Teller:Banner"
+  Teller__Environment: "Production"               # shown in the header pill; a branch environment says its branch name here
+  Teller__Banner: "Scheduled maintenance: online banking sync paused Sat 10 PM to midnight PT"  # yellow banner text; empty = no banner
+  Teller__Accent: "#0f2a5a"                       # header color; prod is navy, ephemeral envs purple, the NKP project teal
+  Teller__JobIntervalSeconds: "45"                # how often the Hangfire stand-in runs a job
+  LedgerApi__BaseUrl: "http://ledger-api"          # the in-house API, by Kubernetes Service name; resolves only inside the cluster
+  Teller__DbHost: "teller-db"                      # SQL Server, by Service name (layer 5)
+  Teller__DbName: "Teller"                         # database the app creates on first boot

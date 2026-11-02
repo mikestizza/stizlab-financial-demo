@@ -1,0 +1,18 @@
+# Secret values are NOT in Git. ${SQL_SA_PASSWORD} is substituted by Flux at
+# apply time from the `teller-secrets` Secret that bootstrap.sh creates in the
+# Flux namespace. In production this is where External Secrets Operator would
+# populate from AWS Parameter Store or Azure Key Vault.
+#
+# Non-secret configuration (teller-config) is generated in kustomization.yaml so
+# overlays can merge per-environment values into it.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: teller-secret
+  labels:
+    app.kubernetes.io/part-of: teller
+type: Opaque
+stringData:
+  # The only secret the app needs. It composes the connection string from this
+  # plus the teller-db service name (Teller__DbHost in the ConfigMap).
+  MSSQL_SA_PASSWORD: "${SQL_SA_PASSWORD}"

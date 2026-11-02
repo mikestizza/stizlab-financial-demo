@@ -1,0 +1,26 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - serviceaccounts.yaml
+  - config.yaml
+  - teller-db.yaml
+  - ledger-api.yaml
+  - teller-web.yaml
+
+# Non-secret app configuration. Overlays merge per-environment values.
+configMapGenerator:
+  - name: teller-config
+    literals:
+      - Teller__Environment=Production
+      - Teller__Banner=
+      - "Teller__Accent=#0f2a5a"
+      - Teller__JobIntervalSeconds=45
+      - LedgerApi__BaseUrl=http://ledger-api
+      - Teller__DbHost=teller-db
+      - Teller__DbName=Teller
+# ConfigMap names carry a content hash, so changing a value in Git changes the
+# Deployment's reference and Flux rolls the pods. No image rebuild for a config change.
+generatorOptions:
+  labels:
+    app.kubernetes.io/part-of: teller

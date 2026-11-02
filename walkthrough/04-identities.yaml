@@ -1,0 +1,28 @@
+# Layer 4: one ServiceAccount per workload. An identity, not a login.
+# RBAC, admission policy and (later) workload identity to Azure or AWS attach to these.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: teller-web                                # the web pods run as this identity (spec.serviceAccountName, layer 7)
+  namespace: teller
+  labels:
+    app.kubernetes.io/part-of: teller
+automountServiceAccountToken: false              # the app never calls the Kubernetes API, so no API token is mounted into the pod
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ledger-api                                # the API pods run as this one
+  namespace: teller
+  labels:
+    app.kubernetes.io/part-of: teller
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: teller-db                                 # SQL Server runs as this one
+  namespace: teller
+  labels:
+    app.kubernetes.io/part-of: teller
+automountServiceAccountToken: false

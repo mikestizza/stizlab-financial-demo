@@ -1,0 +1,34 @@
+# Layer 9c: the Constraints. These switch the templates on and say where they apply.
+# Apply only after 9a/9b have turned into CRDs (kubectl get crd | grep teller), otherwise
+# the API server doesn't know these kinds yet.
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: TellerRequiredLimits                        # the kind template 9a created
+metadata:
+  name: teller-containers-must-have-limits        # a readable name; it appears in the denial message
+spec:
+  enforcementAction: deny                        # reject the request. Alternatives: "warn" (allow + warning) or "dryrun" (audit only)
+  match:
+    kinds:                                       # which object types are checked
+      - apiGroups: ["apps"]
+        kinds: ["Deployment", "StatefulSet", "DaemonSet"]
+      - apiGroups: [""]
+        kinds: ["Pod"]
+    namespaceSelector:
+      matchLabels:
+        stizlab.financial/managed: "true"                # only namespaces carrying our label (layer 1). Platform namespaces are untouched
+---
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: TellerDisallowLatest                        # the kind template 9b created
+metadata:
+  name: teller-images-must-be-pinned
+spec:
+  enforcementAction: deny
+  match:
+    kinds:
+      - apiGroups: ["apps"]
+        kinds: ["Deployment", "StatefulSet", "DaemonSet"]
+      - apiGroups: [""]
+        kinds: ["Pod"]
+    namespaceSelector:
+      matchLabels:
+        stizlab.financial/managed: "true"

@@ -1,0 +1,94 @@
+# Layer 7: the web tier. Two replicas, like WEB01 and WEB02, except these are cattle.
+
+# --- The Service: one stable in-cluster address in front of both web pods.
+apiVersion: v1
+kind: Service
+metadata:
+  name: teller-web                                # the Ingress (layer 8) routes to this name
+  namespace: teller
+  labels:
+    app.kubernetes.io/name: teller-web
+    app.kubernetes.io/part-of: teller
+spec:
+  type: ClusterIP                                # internal only; the outside world comes in through the Ingress
+  selector:
+    app.kubernetes.io/name: teller-web            # spreads requests across every READY pod with this label
+  ports:
+    - name: http
+      port: 80                                   # Service port
+      targetPort: 8080                           # container port (Kestrel, non-root)
+---
+# --- The Deployment: desired state for the web pods. Change it and Kubernetes rolls to the new state.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: teller-web
+  namespace: teller
+  labels:
+    app.kubernetes.io/name: teller-web
+    app.kubernetes.io/part-of: teller
+spec:
+  replicas: 2                                    # two pods; if a node dies, the missing pod is recreated elsewhere
+  strategy:
+    type: RollingUpdate                          # replace pods gradually, never all at once
+    rollingUpdate:
+      maxUnavailable: 0                          # never drop below 2 ready pods during an update
+      maxSurge: 1                                # start 1 new pod, wait for it to be ready, then retire 1 old one
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: teller-web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: teller-web        # matched by the Service, and by ledger-api's NetworkPolicy (only these may call it)
+        app.kubernetes.io/part-of: teller
+    spec:
+      serviceAccountName: teller-web              # identity from layer 4
+      securityContext:
+        runAsNonRoot: true                       # refuse to start as root
+        seccompProfile:
+          type: RuntimeDefault                   # default syscall filter
+      containers:
+        - name: teller-web
+          image: ghcr.io/mikestizza/teller-web:main   # the image CI built from src/TellerWeb/Dockerfile. Flux pins main-<sha> in layer 10
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:                               # every key in these becomes an environment variable
+            - configMapRef:
+                name: teller-config               # layer 3: environment, banner, API URL, DB host
+            - secretRef:
+                name: teller-secret               # layer 2: MSSQL_SA_PASSWORD. The app builds its connection string from it
+          env:
+            - name: POD_NAMESPACE                # Downward API: the pod learns which namespace it is in...
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: NODE_NAME                    # ...and which node it landed on. Shown on the Platform page and footer
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          resources:
+            requests:
+              cpu: 100m                          # what the scheduler reserves: a tenth of a core
+              memory: 160Mi
+            limits:
+              cpu: "1"                           # hard caps; also required by our Gatekeeper policy (layer 9)
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /readyz                      # returns 200 only when SQL Server answers. Until then the Service sends no traffic here
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 12                 # tolerate a minute of "not ready" (SQL starting) without flapping
+          livenessProbe:
+            httpGet:
+              path: /healthz                     # returns 200 if the process is up. If it stops answering, restart the container
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          securityContext:
+            allowPrivilegeEscalation: false      # cannot gain privileges after start
+            capabilities:
+              drop: ["ALL"]                      # no Linux capabilities

@@ -1,0 +1,71 @@
+# Layer 10: the Flux objects that connect the cluster to Git. Applied once by bootstrap.sh.
+# After this, the cluster pulls its desired state from the repo; nobody runs kubectl apply.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: teller-system                             # where the platform team's Flux objects for Teller live (separate from the app namespaces)
+  labels:
+    app.kubernetes.io/part-of: teller
+---
+# --- Where the desired state lives.
+apiVersion: source.toolkit.fluxcd.io/v1          # Flux's source-controller (ships with NKP in kommander-flux)
+kind: GitRepository
+metadata:
+  name: teller-lite
+  namespace: teller-system
+spec:
+  interval: 30s                                  # check the repo for new commits every 30 seconds
+  url: https://github.com/mikestizza/stizlab-financial-demo   # public repo, so no credentials. A private Azure Repos URL would add a secretRef
+  ref:
+    branch: main                                 # only main is watched. Branches reach the cluster only via files CI writes into main
+---
+# --- The root: one Flux Kustomization per environment lives in deploy/flux/envs/. Apply them all.
+apiVersion: kustomize.toolkit.fluxcd.io/v1       # Flux's kustomize-controller
+kind: Kustomization
+metadata:
+  name: teller-envs
+  namespace: teller-system
+spec:
+  interval: 1m                                   # re-apply every minute, which also undoes any manual drift
+  prune: true                                    # if a file disappears from Git, delete what it created. This is how a branch env is torn down
+  wait: false                                    # don't block on health; each environment reports its own status
+  sourceRef:
+    kind: GitRepository
+    name: teller-lite                             # the repo above
+  path: ./deploy/flux/envs                       # prod.yaml today; CI adds <branch>.yaml per feature branch
+  targetNamespace: teller-system                  # the per-environment Kustomizations are created here
+---
+# --- Policy, step 1: the ConstraintTemplates (same files as walkthrough 9a/9b).
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: teller-policy
+  namespace: teller-system
+spec:
+  interval: 5m
+  prune: true
+  wait: true                                     # mark Ready only once the templates are established, so step 2 can depend on it
+  timeout: 2m
+  sourceRef:
+    kind: GitRepository
+    name: teller-lite
+  path: ./deploy/policy/templates
+---
+# --- Policy, step 2: the Constraints (same as walkthrough 9c). Waits for step 1, same ordering you did by hand.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: teller-policy-constraints
+  namespace: teller-system
+spec:
+  dependsOn:
+    - name: teller-policy                         # don't apply until the templates are Ready (the CRDs exist)
+  interval: 5m
+  retryInterval: 20s
+  prune: true
+  wait: true
+  timeout: 2m
+  sourceRef:
+    kind: GitRepository
+    name: teller-lite
+  path: ./deploy/policy/constraints

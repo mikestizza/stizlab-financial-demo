@@ -1,0 +1,18 @@
+# Production overlay. CI updates the image tags below on every merge to main.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: teller
+resources:
+  - ../../base
+images:
+  - name: ghcr.io/mikestizza/teller-web
+    newTag: main-ee6d4a6
+  - name: ghcr.io/mikestizza/ledger-api
+    newTag: main-ee6d4a6
+configMapGenerator:
+  - name: teller-config
+    behavior: merge
+    literals:
+      - Teller__Environment=Production
+      - "Teller__Banner=Scheduled maintenance: online banking sync paused Sat 10 PM to midnight PT"
+      - "Teller__Accent=#0f2a5a"

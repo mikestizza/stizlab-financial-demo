@@ -1,0 +1,58 @@
+# Overlay for the NKP (Kommander) Project "teller-demo".
+#
+# Added through the project's Continuous Deployment tab as a GitOps Source with
+# path ./deploy/envs/project. Kommander deploys it into the project namespace
+# under a project-scoped service account, so this overlay:
+#   - does not create a Namespace (Kommander owns the project namespace)
+#   - does not create the Secret (it is created in the project's Secrets tab,
+#     name teller-secret, single key MSSQL_SA_PASSWORD)
+#   - hardcodes the ingress hosts and class (no Flux variable substitution here),
+#     one host per cluster in the project
+#
+# CI updates the image tags below on every merge to main, same as prod.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: teller-demo
+resources:
+  - ../../base
+images:
+  - name: ghcr.io/mikestizza/teller-web
+    newTag: main-ee6d4a6
+  - name: ghcr.io/mikestizza/ledger-api
+    newTag: main-ee6d4a6
+configMapGenerator:
+  - name: teller-config
+    behavior: merge
+    literals:
+      - Teller__Environment=Project
+      - "Teller__Banner=Deployed by the Teller team through the NKP project 'teller-lite' (Continuous Deployment tab). Secrets came from the project's Secrets tab, not Git."
+      - "Teller__Accent=#0b6e6e"
+patches:
+  # The project namespace already exists and is owned by Kommander.
+  - patch: |-
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: teller
+      $patch: delete
+  # Secret is created in the UI, never in Git.
+  - patch: |-
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: teller-secret
+      $patch: delete
+  - target:
+      kind: Ingress
+      name: teller-web
+    patch: |-
+      - op: replace
+        path: /spec/ingressClassName
+        value: kommander-traefik
+      # One cluster in the project: cluster-vm (workspace emea-prod), Traefik 10.38.207.161
+      - op: replace
+        path: /spec/rules/0/host
+        value: teller-project.10.38.207.161.sslip.io
+      - op: replace
+        path: /spec/tls/0/hosts/0
+        value: teller-project.10.38.207.161.sslip.io

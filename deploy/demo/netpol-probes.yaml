@@ -1,0 +1,43 @@
+# Two identical probe pods. The only differences: namespace and the teller-web label.
+# probe-allowed (teller ns, labeled)  -> expect HTTP 200
+# probe-denied  (intruder ns)        -> expect timeout, blocked by NetworkPolicy
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: intruder
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: probe-allowed
+  namespace: teller
+  labels:
+    app.kubernetes.io/name: teller-web
+spec:
+  restartPolicy: Never
+  serviceAccountName: default
+  containers:
+    - name: probe
+      image: curlimages/curl:8.10.1
+      command: ["sh", "-c"]
+      args:
+        - 'echo "probe-allowed: teller namespace, labeled teller-web"; curl -s -m 5 -o /dev/null -w "RESULT: HTTP %{http_code} in %{time_total}s\n" http://ledger-api.teller.svc.cluster.local/healthz || echo "RESULT: BLOCKED (timeout)"'
+      resources:
+        limits: { cpu: 100m, memory: 64Mi }
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: probe-denied
+  namespace: intruder
+spec:
+  restartPolicy: Never
+  serviceAccountName: default
+  containers:
+    - name: probe
+      image: curlimages/curl:8.10.1
+      command: ["sh", "-c"]
+      args:
+        - 'echo "probe-denied: intruder namespace, no label"; curl -s -m 5 -o /dev/null -w "RESULT: HTTP %{http_code} in %{time_total}s\n" http://ledger-api.teller.svc.cluster.local/healthz || echo "RESULT: BLOCKED by NetworkPolicy (timeout)"'
+      resources:
+        limits: { cpu: 100m, memory: 64Mi }

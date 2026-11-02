@@ -1,0 +1,35 @@
+# Gatekeeper: every container in a teller-managed namespace must declare CPU and
+# memory limits. Based on the gatekeeper-library "containerlimits" template,
+# trimmed to the check that matters for the demo.
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: tellerrequiredlimits
+spec:
+  crd:
+    spec:
+      names:
+        kind: TellerRequiredLimits
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package tellerrequiredlimits
+
+        containers[c] {
+          c := input.review.object.spec.template.spec.containers[_]
+        }
+        containers[c] {
+          c := input.review.object.spec.containers[_]
+        }
+
+        violation[{"msg": msg}] {
+          c := containers[_]
+          not c.resources.limits.cpu
+          msg := sprintf("Policy: container <%v> must set resources.limits.cpu (Teller platform standard)", [c.name])
+        }
+
+        violation[{"msg": msg}] {
+          c := containers[_]
+          not c.resources.limits.memory
+          msg := sprintf("Policy: container <%v> must set resources.limits.memory (Teller platform standard)", [c.name])
+        }
