@@ -52,7 +52,7 @@ patches:
       # One cluster in the project: cluster-vm (workspace emea-prod), Traefik 10.38.207.161
       - op: replace
         path: /spec/rules/0/host
-        value: teller-project.10.38.207.161.sslip.io
+        value: teller-project.10.38.207.171.sslip.io
       - op: replace
         path: /spec/tls/0/hosts/0
-        value: teller-project.10.38.207.161.sslip.io
+        value: teller-project.10.38.207.171.sslip.io
