@@ -12,7 +12,7 @@
 # CI updates the image tags below on every merge to main, same as prod.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-namespace: teller-demo-cz6cl
+namespace: teller-demo2-cz6cl
 resources:
   - ../../base
 images:
