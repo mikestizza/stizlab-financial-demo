@@ -27,6 +27,7 @@ configMapGenerator:
       - Teller__Environment=Project
       - "Teller__Banner=Deployed by the Teller team through the NKP project 'teller-lite' (Continuous Deployment tab). Secrets came from the project's Secrets tab, not Git."
       - "Teller__Accent=#0b6e6e"
+      - "Teller__DbHost=teller-db-type"
 patches:
   # The project namespace already exists and is owned by Kommander.
   - patch: |-
